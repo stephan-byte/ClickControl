@@ -1,0 +1,98 @@
+name: ClickControl Android build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Android SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then
+            SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager -print -quit)"
+          fi
+          set +e
+          yes | "$SDKMANAGER" --licenses
+          LICENSE_STATUS=${PIPESTATUS[1]}
+          set -e
+          if [ "$LICENSE_STATUS" -ne 0 ]; then
+            echo "Android SDK license acceptance failed with status $LICENSE_STATUS."
+            exit "$LICENSE_STATUS"
+          fi
+          "$SDKMANAGER" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Extract Android project archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p extracted
+          unzip -q ClickControl_Android_v0.1.0.zip -d extracted
+          SETTINGS="$(find extracted -type f -name settings.gradle.kts -print -quit)"
+          if [ -z "$SETTINGS" ]; then
+            echo "settings.gradle.kts not found in source archive"
+            exit 1
+          fi
+          PROJECT_DIR="$(dirname "$SETTINGS")"
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+          test -f "$PROJECT_DIR/app/build.gradle.kts"
+          test -f "$PROJECT_DIR/app/src/main/AndroidManifest.xml"
+          echo "===== root build.gradle.kts ====="
+          cat "$PROJECT_DIR/build.gradle.kts"
+          echo "===== app/build.gradle.kts ====="
+          cat "$PROJECT_DIR/app/build.gradle.kts"
+          echo "===== settings.gradle.kts ====="
+          cat "$PROJECT_DIR/settings.gradle.kts"
+          find "$PROJECT_DIR" -type f | sort
+
+          # Kotlin 2.0.21 requires the matching Compose compiler Gradle plugin.
+          grep -q 'id("org.jetbrains.kotlin.android") version "2.0.21" apply false' "$PROJECT_DIR/build.gradle.kts"
+          sed -i '/id("org.jetbrains.kotlin.android") version "2.0.21" apply false/a\    id("org.jetbrains.kotlin.plugin.compose") version "2.0.21" apply false' "$PROJECT_DIR/build.gradle.kts"
+          sed -i '/id("org.jetbrains.kotlin.android")/a\    id("org.jetbrains.kotlin.plugin.compose")' "$PROJECT_DIR/app/build.gradle.kts"
+          sed -i '/composeOptions { kotlinCompilerExtensionVersion = "1.5.15" }/d' "$PROJECT_DIR/app/build.gradle.kts"
+          echo "Applied Kotlin 2.0.21 Compose compiler plugin compatibility fix."
+          cat "$PROJECT_DIR/build.gradle.kts"
+          cat "$PROJECT_DIR/app/build.gradle.kts"
+
+      - name: Configure Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Run unit tests and build debug APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$PROJECT_DIR"
+          gradle --no-daemon --stacktrace testDebugUnitTest assembleDebug
+          APK="$(find app/build/outputs/apk/debug -type f -name '*.apk' -print -quit)"
+          test -n "$APK"
+          test -s "$APK"
+          echo "Built APK: $APK"
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ClickControl-debug-APK
+          path: '**/build/outputs/apk/debug/*.apk'
+          if-no-files-found: error
+          retention-days: 14
