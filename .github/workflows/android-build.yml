@@ -56,6 +56,12 @@ jobs:
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
           test -f "$PROJECT_DIR/app/build.gradle.kts"
           test -f "$PROJECT_DIR/app/src/main/AndroidManifest.xml"
+          echo "===== root build.gradle.kts ====="
+          cat "$PROJECT_DIR/build.gradle.kts"
+          echo "===== app/build.gradle.kts ====="
+          cat "$PROJECT_DIR/app/build.gradle.kts"
+          echo "===== settings.gradle.kts ====="
+          cat "$PROJECT_DIR/settings.gradle.kts"
           find "$PROJECT_DIR" -type f | sort
 
       - name: Configure Gradle
