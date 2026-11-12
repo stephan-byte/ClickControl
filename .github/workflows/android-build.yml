@@ -64,6 +64,15 @@ jobs:
           cat "$PROJECT_DIR/settings.gradle.kts"
           find "$PROJECT_DIR" -type f | sort
 
+          # Kotlin 2.0.21 requires the matching Compose compiler Gradle plugin.
+          grep -q 'id("org.jetbrains.kotlin.android") version "2.0.21" apply false' "$PROJECT_DIR/build.gradle.kts"
+          sed -i '/id("org.jetbrains.kotlin.android") version "2.0.21" apply false/a\    id("org.jetbrains.kotlin.plugin.compose") version "2.0.21" apply false' "$PROJECT_DIR/build.gradle.kts"
+          sed -i '/id("org.jetbrains.kotlin.android")/a\    id("org.jetbrains.kotlin.plugin.compose")' "$PROJECT_DIR/app/build.gradle.kts"
+          sed -i '/composeOptions { kotlinCompilerExtensionVersion = "1.5.15" }/d' "$PROJECT_DIR/app/build.gradle.kts"
+          echo "Applied Kotlin 2.0.21 Compose compiler plugin compatibility fix."
+          cat "$PROJECT_DIR/build.gradle.kts"
+          cat "$PROJECT_DIR/app/build.gradle.kts"
+
       - name: Configure Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
