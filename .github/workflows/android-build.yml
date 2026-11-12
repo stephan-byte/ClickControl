@@ -1,0 +1,76 @@
+name: ClickControl Android build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Android SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then
+            SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager -print -quit)"
+          fi
+          yes | "$SDKMANAGER" --licenses
+          "$SDKMANAGER" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Extract Android project archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p extracted
+          unzip -q ClickControl_Android_v0.1.0.zip -d extracted
+          SETTINGS="$(find extracted -type f -name settings.gradle.kts -print -quit)"
+          if [ -z "$SETTINGS" ]; then
+            echo "settings.gradle.kts not found in source archive"
+            exit 1
+          fi
+          PROJECT_DIR="$(dirname "$SETTINGS")"
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+          test -f "$PROJECT_DIR/app/build.gradle.kts"
+          test -f "$PROJECT_DIR/app/src/main/AndroidManifest.xml"
+          find "$PROJECT_DIR" -type f | sort
+
+      - name: Configure Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Run unit tests and build debug APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$PROJECT_DIR"
+          gradle --no-daemon --stacktrace testDebugUnitTest assembleDebug
+          APK="$(find app/build/outputs/apk/debug -type f -name '*.apk' -print -quit)"
+          test -n "$APK"
+          test -s "$APK"
+          echo "Built APK: $APK"
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ClickControl-debug-APK
+          path: '**/build/outputs/apk/debug/*.apk'
+          if-no-files-found: error
+          retention-days: 14
