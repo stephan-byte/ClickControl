@@ -31,7 +31,14 @@ jobs:
           if [ ! -x "$SDKMANAGER" ]; then
             SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager -print -quit)"
           fi
+          set +e
           yes | "$SDKMANAGER" --licenses
+          LICENSE_STATUS=${PIPESTATUS[1]}
+          set -e
+          if [ "$LICENSE_STATUS" -ne 0 ]; then
+            echo "Android SDK license acceptance failed with status $LICENSE_STATUS."
+            exit "$LICENSE_STATUS"
+          fi
           "$SDKMANAGER" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
       - name: Extract Android project archive
