@@ -89,6 +89,27 @@ jobs:
           test -s "$APK"
           echo "Built APK: $APK"
 
+      - name: Validate APK package, signature, alignment and checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="$(find "$PROJECT_DIR/app/build/outputs/apk/debug" -type f -name '*.apk' -print -quit)"
+          test -n "$APK"
+          test -s "$APK"
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt -print | sort -V | tail -1)"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -1)"
+          ZIPALIGN="$(find "$ANDROID_HOME/build-tools" -type f -name zipalign -print | sort -V | tail -1)"
+          test -x "$AAPT"
+          test -x "$APKSIGNER"
+          test -x "$ZIPALIGN"
+          "$AAPT" dump badging "$APK" | tee "$RUNNER_TEMP/clickcontrol-apk-badging.txt"
+          grep -q "^package: name='" "$RUNNER_TEMP/clickcontrol-apk-badging.txt"
+          "$APKSIGNER" verify --verbose "$APK"
+          "$ZIPALIGN" -c -v 4 "$APK"
+          echo "APK_SIZE_BYTES=$(stat -c %s "$APK")"
+          sha256sum "$APK" | tee "$RUNNER_TEMP/clickcontrol-apk.sha256"
+          echo "APK validation completed."
+
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
