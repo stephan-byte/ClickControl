@@ -19,7 +19,8 @@ Der Workflow `.github/workflows/android-build.yml`:
 1. richtet Java 17 und Android SDK 35 ein,
 2. entpackt das versionierte Projektarchiv,
 3. führt `testDebugUnitTest` und `assembleDebug` aus,
-4. stellt die Debug-APK als Actions-Artefakt bereit.
+4. prüft APK-Paketmetadaten, Signatur, 4-Byte-Alignment und SHA-256-Prüfsumme,
+5. stellt die Debug-APK als Actions-Artefakt bereit.
 
 Lokal kann das Archiv mit Android Studio geöffnet oder nach dem Entpacken mit Gradle gebaut werden. Für einen lokalen Build wird Gradle passend zur Android-Gradle-Plugin-Version benötigt.
 
@@ -28,3 +29,8 @@ Lokal kann das Archiv mit Android Studio geöffnet oder nach dem Entpacken mit G
 - Keine Signaturschlüssel oder Zugangsdaten im Repository hinterlegen.
 - Der Cloud-Build erzeugt eine Debug-APK; keine Store-Signierung oder Veröffentlichung.
 - Ein erfolgreicher Build ist noch kein Nachweis für alle Geräte, Berechtigungen oder Accessibility-/Overlay-Verhaltensweisen.
+
+
+## APK-Abnahmegrenze
+
+Der Build-Workflow prüft die erzeugte Debug-APK technisch (Paketmetadaten, Signatur, Alignment und SHA-256). Diese Prüfungen ersetzen keinen Emulator- oder Praxistest. Overlay-, Accessibility-, Eingabe- und Berechtigungsverhalten müssen auf einem geeigneten Android-Gerät separat geprüft werden.
